@@ -1,88 +1,83 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Foot Tracking with MediaPipe</title>
-    <script type="module">
-        import {
-            FilesetResolver,
-            PoseLandmarker,
-            DrawingUtils
-        } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3';
+  <meta charset="UTF-8" />
+  <title>Foot Tracking Full Model</title>
+  <style>body { margin: 0; overflow: hidden; }</style>
+  <script type="module">
+    import {
+      FilesetResolver,
+      PoseLandmarker,
+      DrawingUtils
+    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
-        let video, canvas, ctx, poseLandmarker, running = true;
+    let video, canvas, ctx, poseLandmarker;
 
-        async function init() {
-            // Setup video
-            video = document.createElement('video');
-            video.autoplay = true;
-            video.playsInline = true;
-            document.body.appendChild(video);
+    async function init() {
+      video = document.createElement("video");
+      video.autoplay = true;
+      video.playsInline = true;
+      document.body.appendChild(video);
 
-            // Setup canvas
-            canvas = document.createElement('canvas');
-            canvas.width = 640;
-            canvas.height = 480;
-            document.body.appendChild(canvas);
-            ctx = canvas.getContext('2d');
+      canvas = document.createElement("canvas");
+      document.body.appendChild(canvas);
+      ctx = canvas.getContext("2d");
 
-            // Get webcam feed
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
 
-            // Load pose model
-            const vision = await FilesetResolver.forVisionTasks();
-            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/pose_landmarker_full.task',
-                    delegate: 'GPU'
-                },
-                runningMode: 'VIDEO',
-                outputSegmentationMasks: false,
-                numPoses: 1
-            });
+      await new Promise((r) => (video.onloadedmetadata = r));
 
-            requestAnimationFrame(trackFoot);
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+      );
+
+      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
+        },
+        runningMode: "VIDEO",
+        numPoses: 1
+      });
+
+      requestAnimationFrame(trackFoot);
+    }
+
+    async function trackFoot() {
+      if (!poseLandmarker || video.readyState !== 4) {
+        requestAnimationFrame(trackFoot);
+        return;
+      }
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const results = await poseLandmarker.detectForVideo(video, performance.now());
+      if (results.landmarks.length > 0) {
+        const draw = new DrawingUtils(ctx);
+        const landmarks = results.landmarks[0];
+        draw.drawLandmarks(landmarks, { color: "red", radius: 3 });
+
+        const LEFT_FOOT_INDEX = 31;
+        const RIGHT_FOOT_INDEX = 32;
+
+        const leftFoot = landmarks[LEFT_FOOT_INDEX];
+        const rightFoot = landmarks[RIGHT_FOOT_INDEX];
+
+        if (leftFoot && rightFoot) {
+          console.log("Left Foot:", leftFoot);
+          console.log("Right Foot:", rightFoot);
         }
+      }
 
-        async function trackFoot() {
-            if (!running || video.readyState !== 4) {
-                requestAnimationFrame(trackFoot);
-                return;
-            }
+      requestAnimationFrame(trackFoot);
+    }
 
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const results = await poseLandmarker.detectForVideo(video, performance.now());
-            const landmarks = results.landmarks?.[0];
-            if (landmarks) {
-                // Draw landmarks
-                const draw = new DrawingUtils(ctx);
-                draw.drawLandmarks(landmarks, { color: 'red', radius: 3 });
-
-                // Get foot landmarks
-                const LEFT_HEEL = 29;
-                const LEFT_FOOT_INDEX = 31;
-                const RIGHT_HEEL = 30;
-                const RIGHT_FOOT_INDEX = 32;
-
-                const leftFoot = landmarks[LEFT_FOOT_INDEX];
-                const rightFoot = landmarks[RIGHT_FOOT_INDEX];
-
-                if (leftFoot && rightFoot) {
-                    console.log('Left Foot:', leftFoot);
-                    console.log('Right Foot:', rightFoot);
-                }
-            }
-
-            requestAnimationFrame(trackFoot);
-        }
-
-        init();
-    </script>
+    init();
+  </script>
 </head>
-<body style="margin: 0; overflow: hidden; background: black;">
-</body>
+<body></body>
 </html>
