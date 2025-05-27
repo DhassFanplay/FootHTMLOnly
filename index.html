@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Foot Tracking Full Model</title>
+  <title>Foot Tracking Full Model with Correct WASM URL</title>
   <style>body { margin: 0; overflow: hidden; }</style>
   <script type="module">
     import {
@@ -31,8 +31,9 @@
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
 
+      // Notice the trailing slash here:
       const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/"
       );
 
       poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
