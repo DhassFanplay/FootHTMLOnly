@@ -62,7 +62,7 @@
     let resizedTemplate = null;
     let templateSize = 150;
     const scale = 0.5; // Resize factor for faster processing
-    const minMatchScore = 0.85;
+    const minMatchScore = 0.5;
 
     async function startCamera() {
         const stream = await navigator.mediaDevices.getUserMedia({
