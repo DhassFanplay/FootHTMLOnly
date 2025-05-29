@@ -65,7 +65,11 @@
     const minMatchScore = 0.85;
 
     async function startCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: 'environment' } // Prefer back camera
+            }
+        });
       video.srcObject = stream;
 
       return new Promise(resolve => {
