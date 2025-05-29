@@ -5,42 +5,45 @@
   <title>Foot Detection with Debug Dot</title>
   <style>
     body {
-      margin: 0;
-      background: #111;
-      overflow: hidden;
-      color: white;
-      font-family: sans-serif;
-    }
+  margin: 0;
+  background: #111;
+  overflow: hidden;
+  color: white;
+  font-family: sans-serif;
+}
 
-    canvas, video {
-      position: absolute;
-      top: 0;
-      left: 0;
-    }
+canvas, video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+}
 
-    #captureButton {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 100;
-      padding: 10px 20px;
-      font-size: 16px;
-      background: #00aaff;
-      border: none;
-      border-radius: 4px;
-      color: white;
-      cursor: pointer;
-    }
+#captureButton {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  padding: 10px 20px;
+  font-size: 16px;
+  background: #00aaff;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+}
 
-    #status {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 10px;
-      background: #333;
-      border-radius: 4px;
-      z-index: 100;
-    }
+#status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 10px;
+  background: #333;
+  border-radius: 4px;
+  z-index: 100;
+}
   </style>
 </head>
 <body>
