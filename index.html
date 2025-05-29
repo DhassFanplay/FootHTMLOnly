@@ -2,83 +2,174 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Foot Tracking Full Model with Correct WASM URL</title>
-  <style>body { margin: 0; overflow: hidden; }</style>
-  <script type="module">
-    import {
-      FilesetResolver,
-      PoseLandmarker,
-      DrawingUtils
-    } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+  <title>Foot Detection with Debug Dot</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+      color: white;
+      font-family: sans-serif;
+    }
 
-    let video, canvas, ctx, poseLandmarker;
+    canvas, video {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
 
-    async function init() {
-      video = document.createElement("video");
-      video.autoplay = true;
-      video.playsInline = true;
-      document.body.appendChild(video);
+    #captureButton {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #00aaff;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+    }
 
-      canvas = document.createElement("canvas");
-      document.body.appendChild(canvas);
-      ctx = canvas.getContext("2d");
+    #status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 10px;
+      background: #333;
+      border-radius: 4px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <button id="captureButton">Capture Foot</button>
+  <div id="status">Waiting for capture...</div>
 
+  <script async src="https://docs.opencv.org/4.9.0/opencv.js"></script>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureButton = document.getElementById('captureButton');
+    const statusDiv = document.getElementById('status');
+
+    let template = null;
+    let resizedTemplate = null;
+    let templateSize = 150;
+    const scale = 0.5; // Resize factor for faster processing
+    const minMatchScore = 0.85;
+
+    async function startCamera() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       video.srcObject = stream;
 
-      await new Promise((r) => (video.onloadedmetadata = r));
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-
-      // Notice the trailing slash here:
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm/"
-      );
-
-      poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath:
-            "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task"
-        },
-        runningMode: "VIDEO",
-        numPoses: 1
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => {
+          video.width = canvas.width = video.videoWidth;
+          video.height = canvas.height = video.videoHeight;
+          resolve();
+        };
       });
-
-      requestAnimationFrame(trackFoot);
     }
 
-    async function trackFoot() {
-      if (!poseLandmarker || video.readyState !== 4) {
-        requestAnimationFrame(trackFoot);
+    function waitForOpenCV() {
+      return new Promise(resolve => {
+        const check = () => {
+          if (cv && cv.Mat) resolve();
+          else setTimeout(check, 100);
+        };
+        check();
+      });
+    }
+
+    function drawFootDot(x, y) {
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, 2 * Math.PI);
+      ctx.fillStyle = 'red';
+      ctx.fill();
+    }
+
+    function captureTemplate() {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = video.videoWidth;
+      tempCanvas.height = video.videoHeight;
+      const tempCtx = tempCanvas.getContext('2d');
+
+      tempCtx.drawImage(video, 0, 0);
+      const centerX = Math.floor(video.videoWidth / 2);
+      const centerY = Math.floor(video.videoHeight / 2);
+      const startX = centerX - templateSize / 2;
+      const startY = centerY - templateSize / 2;
+
+      const imageData = tempCtx.getImageData(startX, startY, templateSize, templateSize);
+      template = cv.matFromImageData(imageData);
+      cv.cvtColor(template, template, cv.COLOR_RGBA2GRAY);
+
+      // Resize template for matching
+      resizedTemplate = new cv.Mat();
+      cv.resize(template, resizedTemplate, new cv.Size(0, 0), scale, scale, cv.INTER_AREA);
+
+      statusDiv.textContent = "✅ Foot captured!";
+      console.log("✅ Foot template captured from center area");
+    }
+
+    let matchBuffer = null;
+
+    function detect() {
+      ctx.drawImage(video, 0, 0);
+      if (!resizedTemplate) {
+        requestAnimationFrame(detect);
         return;
       }
 
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const frameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const src = cv.matFromImageData(frameData);
+      const gray = new cv.Mat();
+      const resized = new cv.Mat();
 
-      const results = await poseLandmarker.detectForVideo(video, performance.now());
-      if (results.landmarks.length > 0) {
-        const draw = new DrawingUtils(ctx);
-        const landmarks = results.landmarks[0];
-        draw.drawLandmarks(landmarks, { color: "red", radius: 3 });
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0);
+      cv.resize(gray, resized, new cv.Size(0, 0), scale, scale, cv.INTER_AREA);
 
-        const LEFT_FOOT_INDEX = 31;
-        const RIGHT_FOOT_INDEX = 32;
-
-        const leftFoot = landmarks[LEFT_FOOT_INDEX];
-        const rightFoot = landmarks[RIGHT_FOOT_INDEX];
-
-        if (leftFoot && rightFoot) {
-          console.log("Left Foot:", leftFoot);
-          console.log("Right Foot:", rightFoot);
-        }
+      if (!matchBuffer || matchBuffer.rows !== (resized.rows - resizedTemplate.rows + 1) || matchBuffer.cols !== (resized.cols - resizedTemplate.cols + 1)) {
+        if (matchBuffer) matchBuffer.delete();
+        matchBuffer = new cv.Mat();
       }
 
-      requestAnimationFrame(trackFoot);
+      const result = matchBuffer;
+      cv.matchTemplate(resized, resizedTemplate, result, cv.TM_CCOEFF_NORMED);
+      const minMax = cv.minMaxLoc(result);
+      const pt = minMax.maxLoc;
+      const score = minMax.maxVal;
+
+      if (score > minMatchScore) {
+        const centerX = (pt.x + resizedTemplate.cols / 2) / scale;
+        const centerY = (pt.y + resizedTemplate.rows / 2) / scale;
+        drawFootDot(centerX, centerY);
+        statusDiv.textContent = `👣 Foot Detected (Score: ${score.toFixed(2)})`;
+        console.log(`Foot at (${centerX}, ${centerY})`);
+      } else {
+        statusDiv.textContent = `🔍 Scanning... (Score: ${score.toFixed(2)})`;
+      }
+
+      src.delete(); gray.delete(); resized.delete();
+      requestAnimationFrame(detect);
     }
 
-    init();
+    async function main() {
+      await waitForOpenCV();
+      await startCamera();
+      captureButton.onclick = captureTemplate;
+      statusDiv.textContent = "📷 Align foot and press capture";
+      detect();
+    }
+
+    window.addEventListener('load', main);
   </script>
-</head>
-<body></body>
+</body>
 </html>
